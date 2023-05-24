@@ -1,4 +1,4 @@
-export default function createMarcup(images) {
+export function createMarcup(images) {
     return images
         .map(
           ({
