@@ -94,11 +94,8 @@ const refs = {
     if (e.target.nodeName !== 'IMG') {
       return;
     }
-    const options = {
-      captionsData: 'alt',
-      captionDelay: 250,
-    };
-    new SimpleLightbox('.gallery__item', options);
+    
+    new SimpleLightbox('.gallery__item', {captionsData:"alt", captionDelay:250});
   }
   
   function smoothScroll() {
