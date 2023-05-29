@@ -10,9 +10,9 @@ export function createMarcup(images) {
             comments,
             downloads,
           }) => {
-            return `<a class="gallery__item" href="${largeImageURL}">
-             <div class="photo-card">
-      <img src="${webformatURL}" srcset ${largeImageURL} alt="${tags}" loading="lazy" />
+          return `<div class="photo-card">
+           <a class="gallery__item" href="${largeImageURL}">
+    <img src="${webformatURL}" srcset ${largeImageURL} alt="${tags}" loading="lazy" /></a>
       <div class="info">
         <p class="info-item">
           <b>Likes ${likes}</b>
@@ -27,7 +27,7 @@ export function createMarcup(images) {
           <b>Downloads ${downloads}</b>
         </p>
       </div>
-    </div> </a>`;
+    </div> `;
           }
         )
         .join('');

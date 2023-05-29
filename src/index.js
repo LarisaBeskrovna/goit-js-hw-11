@@ -95,8 +95,10 @@ const refs = {
       return;
     }
     
-    new SimpleLightbox('.gallery__item', {captionsData:"alt", captionDelay:250});
+    new SimpleLightbox('.photo-card a', {captionsData:"alt", captionDelay:250});
   }
+
+
   
   function smoothScroll() {
     const { height: cardHeight } =
@@ -118,5 +120,4 @@ const refs = {
   }
   
   window.addEventListener('scroll', handleScroll);
-
 
