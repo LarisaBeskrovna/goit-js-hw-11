@@ -1,123 +1,132 @@
-import axionImg from './JS/axionImg';
+import {fetchImages} from './JS/axionImg';
 import Notiflix from 'notiflix';
 import { createMarcup } from './JS/galary';
-import button from './JS/button';
+import throttle from 'lodash.throttle';
 import './main.css';
 import SimpleLightbox from "simplelightbox";
-import SimpleLightbox from "simplelightbox/dist/simple-lightbox.esm";
+import "simplelightbox/dist/simple-lightbox.min.css";
 
-const refs = {
-    form: document.querySelector('#search-form'),
-    gallery: document.querySelector('.gallery'),
-  };
+const formEl = document.getElementById('search-form');
+const galleryEl = document.querySelector('.gallery');
+const spinnerEl = document.getElementById('loading');
+
+let searchQuery = '';
+const per_page = 40;
+let markup = '';
+let totalHits = 0;
+let gallery;
+
+const options = {
+  q: searchQuery,
+  page: 0,
+  per_page: per_page,
+  image_type: 'photo',
+  orientation: 'horizontal',
+  safesearch: true,
+};
   
-  const newImage = new axionImg();
-  const loadBtn = new button({
-    selector: '.load-more',
-    isHidden: true,
-  });
-  
-  refs.form.addEventListener('submit', onSubmitSearch);
-  loadBtn.button.addEventListener('click', onLoadMore);
-  refs.gallery.addEventListener('click', onClickOpenLightbox);
+formEl.addEventListener('submit', onSubmitSearch);
   
   function onSubmitSearch(event) {
     event.preventDefault();
+    galleryEl.innerHTML = '';
+    options.page = 0;
+    searchQuery = formEl.elements[0].value.trim();
+    if (searchQuery) {
+      spinnerEl.classList.add('visible');
+      handleFetchRequest(searchQuery);
+      addInfiniteScroll();
+    } else {
+      Notiflix.Notify.failure('Search query is empty');
+      return;
+    }
+    formEl.reset();
+  }
+
+  function handleFetchRequest(searchQuery) {
+    options.page = +1;
+    options.q = searchQuery;
   
-    newImage.searchQuery = event.currentTarget.elements.searchQuery.value;
-    newImage.resetPage();
-    newImage
-      .fetchImages()
-      .then(({ hits, totalHits }) => {
-        if (hits.length === 0 || newImage.searchQuery === '') {
-          clearPage();
-          loadBtn.hide();
-          throw new Error();
+    fetchImages(options)
+      .then(images => {
+        if (images.hits.length === 0) {
+          Notiflix.Notify.failure(
+            'Sorry, there are no images matching your search query. Please try again.'
+          );
         } else {
-          console.log(hits);
-          return hits;
+          totalHits = images.totalHits;
+          markup = createMarcup(images);
+          createImagesOnPage(markup);
+  
+          gallery = new SimpleLightbox('a', {
+            showCounter: false,
+            captions: true,
+            captionsData: 'alt',
+            captionClass: 'captions-style',
+          }).refresh();
         }
       })
-      .then(hits => {
-        clearPage();
-        createImagesOnPage(hits);
-        if (hits.length < newImage.per_page) {
-          loadBtn.hide();
-        } else {
-          loadBtn.show();
-        }
-      })
-      .catch(error => {
-        console.log(error);
-        Notiflix.Notify.failure(
-          'Sorry, there are no images matching your search query. Please try again.'
-        );
-      })
-      .finally(() => refs.form.reset());
+      .catch(error => Notiflix.Notify.failure(error));
   }
   
-  function createImagesOnPage(images) {
-    const marcup = createMarcup(images)
-    refs.gallery.insertAdjacentHTML('beforeend', marcup);
+  function createImagesOnPage(markup) {
+      galleryEl.insertAdjacentHTML('beforeend', markup);
+      spinnerEl.classList.remove('visible');
   }
   
   function onLoadMore() {
-    loadBtn.disable();
-    newImage
-      .fetchImages()
-      .then(({ hits }) => {
-        if (hits.length === 0) {
-          loadBtn.hide();
-          throw new Error();
-        }
-        return hits;
-      })
-      .then(hits => {
-        createImagesOnPage(hits);
-        smoothScroll();
-      })
-      .then(() => loadBtn.enable())
-      .catch(error => {
-        console.log(error);
-        Notiflix.Notify.failure(
-          "We're sorry, but you've reached the end of search results."
-        );
-      });
-  }
-  
-  function clearPage() {
-    refs.gallery.innerHTML = '';
-  }
-  
-  function onClickOpenLightbox(e) {
-    e.preventDefault();
-    if (e.target.nodeName !== 'IMG') {
-      return;
+    if (Math.ceil(totalHits / per_page) > options.page) {
+      options.page += 1;
+      options.q = searchQuery;
+      fetchImages(options)
+        .then(images => {
+          markup = createMarcup(images);
+          createImagesOnPage(markup);
+          gallery.refresh();
+          smoothScroll();
+        })
+        .catch(error => {
+          Notiflix.Notify.warning(error.response.data);
+        });
+    } else {
+      options.page = 0;
+      removeInfiniteScroll();
+      Notiflix.Notify.warning(
+        "We're sorry, but you've reached the end of search results."
+      );
     }
-    
-    new SimpleLightbox('.photo-card a', {captionsData:"alt", captionDelay:250});
   }
-
-
-  
+   
+   
   function smoothScroll() {
     const { height: cardHeight } =
-      refs.gallery.firstElementChild.getBoundingClientRect();
-  
-    window.scrollBy({
+    document.querySelector('.gallery')
+    .firstElementChild.getBoundingClientRect();
+      window.scrollBy({
       top: cardHeight * 2,
       behavior: 'smooth',
     });
   }
   
-  function handleScroll() {
-    const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
-  
-    if (scrollTop + clientHeight >= scrollHeight - 5) {
-      onLoadMore();
-      loadBtn.hide();
-    }
+  let throttledHandleInfiniteScroll = null;
+
+function addInfiniteScroll() {
+  removeInfiniteScroll();
+  throttledHandleInfiniteScroll = throttle(handleInfiniteScroll, 500);
+  window.addEventListener('scroll', throttledHandleInfiniteScroll);
+}
+
+function removeInfiniteScroll() {
+  window.removeEventListener('scroll', throttledHandleInfiniteScroll);
+}
+
+function handleInfiniteScroll() {
+  const endOfPage =
+    window.innerHeight + window.pageYOffset >= document.body.offsetHeight;
+
+  if (endOfPage) {
+    onLoadMore();
   }
-  
-  window.addEventListener('scroll', handleScroll);
+}
+
 

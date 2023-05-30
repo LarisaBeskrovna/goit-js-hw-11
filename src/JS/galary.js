@@ -1,5 +1,5 @@
-export function createMarcup(images) {
-    return images
+export function createMarcup({ hits }) {
+  let markup = hits
         .map(
           ({
             webformatURL,
@@ -31,4 +31,5 @@ export function createMarcup(images) {
           }
         )
         .join('');
+        return markup;
     }
